@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { useState, Suspense, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Shield, ArrowRight, CheckCircle2, AlertCircle, Mail, Code, Globe } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-type Status = "idle" | "sending" | "sent" | "error";
+type Status = "idle" | "sending" | "sent" | "error" | "rate_limited";
 
 function LoginInner() {
   const searchParams = useSearchParams();
@@ -17,10 +17,35 @@ function LoginInner() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(initialError);
+  const [cooldownTime, setCooldownTime] = useState(0);
+  const [lastRequestTime, setLastRequestTime] = useState<number | null>(null);
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (cooldownTime > 0) {
+      const timer = setTimeout(() => {
+        setCooldownTime(cooldownTime - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldownTime]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    // Check rate limiting - 60 seconds cooldown between requests
+    const now = Date.now();
+    const COOLDOWN_PERIOD = 60000; // 60 seconds
+    
+    if (lastRequestTime && (now - lastRequestTime) < COOLDOWN_PERIOD) {
+      const remainingTime = Math.ceil((COOLDOWN_PERIOD - (now - lastRequestTime)) / 1000);
+      setCooldownTime(remainingTime);
+      setStatus("rate_limited");
+      setError(`Please wait ${remainingTime} seconds before requesting another magic link.`);
+      return;
+    }
+
     setStatus("sending");
 
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
@@ -34,19 +59,34 @@ function LoginInner() {
       ? 'https://clauseit.vercel.app' 
       : window.location.origin;
     
-    const { error: err } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: {
-        emailRedirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(next)}`,
-      },
-    });
+    try {
+      const { error: err } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          emailRedirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(next)}`,
+        },
+      });
 
-    if (err) {
+      if (err) {
+        // Handle specific rate limit error
+        if (err.message.includes('rate limit') || err.message.includes('too many requests')) {
+          setStatus("rate_limited");
+          setError("Too many requests. Please wait a moment before trying again.");
+          setCooldownTime(60);
+        } else {
+          setStatus("error");
+          setError(err.message);
+        }
+        return;
+      }
+
+      // Success - update last request time
+      setLastRequestTime(now);
+      setStatus("sent");
+    } catch (error) {
       setStatus("error");
-      setError(err.message);
-      return;
+      setError(error instanceof Error ? error.message : "An unexpected error occurred");
     }
-    setStatus("sent");
   }
 
   async function handleOAuthSignIn(provider: 'google' | 'github') {
@@ -189,17 +229,30 @@ function LoginInner() {
               {error && (
                 <div className="flex items-start gap-2 px-4 py-3 rounded-xl border border-foreground/10 bg-surface/60 text-xs text-muted-foreground">
                   <AlertCircle size={14} strokeWidth={1.5} className="mt-0.5 shrink-0" />
-                  <span className="leading-relaxed">{error}</span>
+                  <div className="leading-relaxed">
+                    <span>{error}</span>
+                    {status === "rate_limited" && (
+                      <span className="block mt-1 text-subtle">
+                        Tip: Use Google or GitHub sign-in for instant access.
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
 
               <button
                 type="submit"
-                disabled={status === "sending" || !email}
+                disabled={status === "sending" || status === "rate_limited" || !email}
                 className="w-full py-3.5 bg-foreground text-background rounded-full text-sm font-medium uppercase tracking-[0.22em] hover:bg-foreground/90 transition-colors flex items-center justify-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {status === "sending" ? "Sending…" : "Send Magic Link"}
-                {status !== "sending" && (
+                {status === "sending" ? (
+                  "Sending…"
+                ) : status === "rate_limited" ? (
+                  `Wait ${cooldownTime}s`
+                ) : (
+                  "Send Magic Link"
+                )}
+                {status !== "sending" && status !== "rate_limited" && (
                   <ArrowRight size={15} strokeWidth={1.75} className="group-hover:translate-x-0.5 transition-transform" />
                 )}
               </button>
