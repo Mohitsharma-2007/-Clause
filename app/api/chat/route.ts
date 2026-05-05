@@ -41,7 +41,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "messages[] is required" }, { status: 400 });
   }
 
-  const agent = getAgent(body.agent);
+  // Default to FinanceAgent if no agent specified or agent not found
+  const agentId = body.agent || "FinanceAgent";
+  const agent = getAgent(agentId) || getAgent("FinanceAgent");
   const lastUser = [...userMessages].reverse().find((m) => m.role === "user");
   const useRag = body.useRag !== false && !!lastUser;
 
@@ -153,7 +155,6 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     content: result.content,
-    provider: result.provider,
     agent: agent.id,
     citations,
   });

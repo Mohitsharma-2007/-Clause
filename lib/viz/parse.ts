@@ -37,7 +37,12 @@ export type Segment = { kind: "text"; content: string } | { kind: "viz"; spec: V
 
 const BLOCK_RE = /```clause:viz\s*([\s\S]*?)```/g;
 
-export function parseAssistantContent(content: string): Segment[] {
+export function parseAssistantContent(content: string | undefined | null): Segment[] {
+  // Guard against undefined/null content
+  if (!content) {
+    return [];
+  }
+
   const segments: Segment[] = [];
   let lastIndex = 0;
 

@@ -12,7 +12,20 @@ type Status = "idle" | "sending" | "sent" | "error" | "rate_limited";
 function LoginInner() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/dashboard";
-  const initialError = searchParams.get("error") ? "Authentication failed. Try again." : null;
+  
+  // Handle specific error cases with friendly messages
+  const errorParam = searchParams.get("error");
+  let initialError: string | null = null;
+  
+  if (errorParam) {
+    if (errorParam === "github_not_configured") {
+      initialError = "GitHub sign-in is not configured. Please use Google or email sign-in.";
+    } else if (errorParam === "github_no_code") {
+      initialError = "GitHub authentication was cancelled. Try again or use another method.";
+    } else {
+      initialError = "Authentication failed. Try again.";
+    }
+  }
 
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<Status>("idle");
@@ -94,6 +107,17 @@ function LoginInner() {
     setError(null);
     setStatus("sending");
 
+    if (provider === 'github') {
+      // Use our custom GitHub OAuth route - it will handle missing config gracefully
+      const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL 
+        ? (process.env.NODE_ENV === 'production' ? 'https://clauseit.vercel.app' : 'http://localhost:3000')
+        : window.location.origin;
+      
+      window.location.href = `${baseUrl}/api/auth/github?next=${encodeURIComponent(next)}`;
+      return;
+    }
+
+    // Google uses Supabase OAuth
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
       setStatus("error");
       setError("Authentication is not configured. Add Supabase keys to .env.local.");
@@ -121,7 +145,6 @@ function LoginInner() {
       }
       
       console.log(`${provider} OAuth initiated successfully:`, data);
-      // The OAuth flow will redirect the user, so we don't need to do anything else
     } catch (error) {
       console.error(`Unexpected ${provider} error:`, error);
       setStatus("error");
