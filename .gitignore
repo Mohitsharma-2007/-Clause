@@ -10,6 +10,16 @@
 !.yarn/releases
 !.yarn/versions
 /venv
+server/venv/
+*.pyc
+__pycache__/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+*.so
+*.dll
+*.dylib
 # testing
 /coverage
 
