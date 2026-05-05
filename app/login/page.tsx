@@ -50,6 +50,7 @@ function LoginInner() {
   }
 
   async function handleOAuthSignIn(provider: 'google' | 'github') {
+    console.log(`Attempting ${provider} sign in...`);
     setError(null);
     setStatus("sending");
 
@@ -64,17 +65,27 @@ function LoginInner() {
       ? 'https://clauseit.vercel.app' 
       : window.location.origin;
 
-    const { error: err } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(next)}`,
-      },
-    });
+    try {
+      const { error: err, data } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(next)}`,
+        },
+      });
 
-    if (err) {
+      if (err) {
+        console.error(`${provider} OAuth error:`, err);
+        setStatus("error");
+        setError(`${provider} sign in failed: ${err.message}`);
+        return;
+      }
+      
+      console.log(`${provider} OAuth initiated successfully:`, data);
+      // The OAuth flow will redirect the user, so we don't need to do anything else
+    } catch (error) {
+      console.error(`Unexpected ${provider} error:`, error);
       setStatus("error");
-      setError(`${provider} sign in failed: ${err.message}`);
-      return;
+      setError(`${provider} sign in failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -97,10 +108,10 @@ function LoginInner() {
           </Link>
           <div className="space-y-2">
             <h1 className="font-display text-3xl md:text-4xl font-light tracking-tight">
-              Welcome <span className="italic text-foreground/80">back.</span>
+              Sign in to <span className="italic text-foreground/80">Clause.</span>
             </h1>
             <p className="text-muted-foreground text-sm font-light">
-              Sign in with a magic link &mdash; no passwords.
+              Choose your preferred sign-in method.
             </p>
           </div>
         </div>
@@ -125,10 +136,12 @@ function LoginInner() {
           <div className="space-y-6">
             {/* OAuth Buttons */}
             <div className="space-y-3">
+              <div className="text-xs text-subtle text-center mb-2">Quick sign-in</div>
               <button
                 onClick={() => handleOAuthSignIn('google')}
                 disabled={status === "sending"}
                 className="w-full py-3.5 px-5 rounded-full bg-surface/60 border border-foreground/8 hover:border-foreground/35 transition-colors flex items-center justify-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ display: 'flex' }}
               >
                 <Globe size={18} strokeWidth={1.5} />
                 <span className="text-sm font-light">Continue with Google</span>
@@ -138,6 +151,7 @@ function LoginInner() {
                 onClick={() => handleOAuthSignIn('github')}
                 disabled={status === "sending"}
                 className="w-full py-3.5 px-5 rounded-full bg-surface/60 border border-foreground/8 hover:border-foreground/35 transition-colors flex items-center justify-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ display: 'flex' }}
               >
                 <Code size={18} strokeWidth={1.5} />
                 <span className="text-sm font-light">Continue with GitHub</span>
@@ -193,12 +207,17 @@ function LoginInner() {
           </div>
         )}
 
-        <p className="text-center text-xs text-muted-foreground font-light">
-          New here?{" "}
-          <Link href="/onboarding" className="text-foreground font-medium hover:underline underline-offset-4">
-            Create a workspace
-          </Link>
-        </p>
+        <div className="text-center space-y-3">
+          <p className="text-xs text-muted-foreground font-light">
+            New to Clause?{" "}
+            <Link href="/onboarding" className="text-foreground font-medium hover:underline underline-offset-4">
+              Create your workspace
+            </Link>
+          </p>
+          <p className="text-[10px] text-subtle">
+            Free for individuals • No credit card required
+          </p>
+        </div>
       </motion.div>
 
       <div className="fixed bottom-6 text-[10px] font-medium uppercase tracking-[0.32em] text-subtle">
