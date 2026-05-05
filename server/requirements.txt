@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+google-generativeai
+supabase
+python-dotenv
+pdfplumber
+python-multipart
+# pathway  # Use pip install pathway (Requires Linux/WSL/Docker)

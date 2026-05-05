@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx --no-install next lint)",
+      "Bash(npx --no-install eslint 'app/**/*.{ts,tsx}')",
+      "Bash(npx --no-install tsc --noEmit)",
+      "Bash(npx --no-install next build)",
+      "Bash(npm install *)",
+      "Bash(npx --no-install eslint \"app/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx}\")"
+    ]
+  }
+}
