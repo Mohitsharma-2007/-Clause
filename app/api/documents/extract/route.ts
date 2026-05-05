@@ -54,10 +54,9 @@ export async function POST(request: Request) {
   try {
     // Dynamic import — pdf-parse loads test fixtures at top level when imported eagerly,
     // which crashes Next's bundler. require-at-call avoids that.
-    const pdfParse = (await import("pdf-parse")).default as (b: Buffer) => Promise<{
-      text: string;
-      numpages: number;
-    }>;
+    const pdfParseModule = await import("pdf-parse");
+    // Use the module directly as it exports a function
+    const pdfParse = pdfParseModule as any;
     const parsed = await pdfParse(buf);
     const text = (parsed.text ?? "").replace(/\u0000/g, "").trim();
     return NextResponse.json({
