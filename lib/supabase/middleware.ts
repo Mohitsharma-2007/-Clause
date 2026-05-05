@@ -39,9 +39,31 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && isAuthRoute) {
+    // Check if user has completed onboarding
+    const { data: orgData } = await supabase
+      .from("organizations")
+      .select("company_name")
+      .eq("owner_id", user.id)
+      .single();
+    
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = orgData ? "/dashboard" : "/onboarding";
     return NextResponse.redirect(url);
+  }
+
+  // Check if user is trying to access dashboard without onboarding
+  if (user && pathname.startsWith("/dashboard")) {
+    const { data: orgData } = await supabase
+      .from("organizations")
+      .select("company_name")
+      .eq("owner_id", user.id)
+      .single();
+    
+    if (!orgData) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/onboarding";
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;

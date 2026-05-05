@@ -2,7 +2,7 @@
 
 import React, { useState, Suspense } from "react";
 import { motion } from "framer-motion";
-import { Shield, ArrowRight, CheckCircle2, AlertCircle } from "lucide-react";
+import { Shield, ArrowRight, CheckCircle2, AlertCircle, Mail, Code, Globe } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -30,11 +30,14 @@ function LoginInner() {
     }
 
     const supabase = createClient();
-    const origin = window.location.origin;
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://clauseit.vercel.app' 
+      : window.location.origin;
+    
     const { error: err } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
-        emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        emailRedirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(next)}`,
       },
     });
 
@@ -44,6 +47,35 @@ function LoginInner() {
       return;
     }
     setStatus("sent");
+  }
+
+  async function handleOAuthSignIn(provider: 'google' | 'github') {
+    setError(null);
+    setStatus("sending");
+
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      setStatus("error");
+      setError("Authentication is not configured. Add Supabase keys to .env.local.");
+      return;
+    }
+
+    const supabase = createClient();
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://clauseit.vercel.app' 
+      : window.location.origin;
+
+    const { error: err } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(next)}`,
+      },
+    });
+
+    if (err) {
+      setStatus("error");
+      setError(`${provider} sign in failed: ${err.message}`);
+      return;
+    }
   }
 
   return (
@@ -90,41 +122,75 @@ function LoginInner() {
             </button>
           </div>
         ) : (
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-[10px] font-medium uppercase tracking-[0.3em] text-muted-foreground ml-3">
-                Email Address
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@company.com"
-                autoComplete="email"
-                className="w-full px-5 py-3.5 rounded-full bg-surface/60 border border-foreground/8 focus:border-foreground/35 outline-none transition-colors font-light text-sm placeholder:text-subtle"
-              />
+          <div className="space-y-6">
+            {/* OAuth Buttons */}
+            <div className="space-y-3">
+              <button
+                onClick={() => handleOAuthSignIn('google')}
+                disabled={status === "sending"}
+                className="w-full py-3.5 px-5 rounded-full bg-surface/60 border border-foreground/8 hover:border-foreground/35 transition-colors flex items-center justify-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Globe size={18} strokeWidth={1.5} />
+                <span className="text-sm font-light">Continue with Google</span>
+              </button>
+              
+              <button
+                onClick={() => handleOAuthSignIn('github')}
+                disabled={status === "sending"}
+                className="w-full py-3.5 px-5 rounded-full bg-surface/60 border border-foreground/8 hover:border-foreground/35 transition-colors flex items-center justify-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Code size={18} strokeWidth={1.5} />
+                <span className="text-sm font-light">Continue with GitHub</span>
+              </button>
             </div>
 
-            {error && (
-              <div className="flex items-start gap-2 px-4 py-3 rounded-xl border border-foreground/10 bg-surface/60 text-xs text-muted-foreground">
-                <AlertCircle size={14} strokeWidth={1.5} className="mt-0.5 shrink-0" />
-                <span className="leading-relaxed">{error}</span>
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-foreground/8"></div>
               </div>
-            )}
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-background px-4 text-muted-foreground">or continue with email</span>
+              </div>
+            </div>
 
-            <button
-              type="submit"
-              disabled={status === "sending" || !email}
-              className="w-full py-3.5 bg-foreground text-background rounded-full text-sm font-medium uppercase tracking-[0.22em] hover:bg-foreground/90 transition-colors flex items-center justify-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {status === "sending" ? "Sending…" : "Send Magic Link"}
-              {status !== "sending" && (
-                <ArrowRight size={15} strokeWidth={1.75} className="group-hover:translate-x-0.5 transition-transform" />
+            {/* Email Form */}
+            <form className="space-y-4" onSubmit={handleSubmit}>
+              <div className="space-y-2">
+                <label htmlFor="email" className="text-[10px] font-medium uppercase tracking-[0.3em] text-muted-foreground ml-3">
+                  Email Address
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@company.com"
+                  autoComplete="email"
+                  className="w-full px-5 py-3.5 rounded-full bg-surface/60 border border-foreground/8 focus:border-foreground/35 outline-none transition-colors font-light text-sm placeholder:text-subtle"
+                />
+              </div>
+
+              {error && (
+                <div className="flex items-start gap-2 px-4 py-3 rounded-xl border border-foreground/10 bg-surface/60 text-xs text-muted-foreground">
+                  <AlertCircle size={14} strokeWidth={1.5} className="mt-0.5 shrink-0" />
+                  <span className="leading-relaxed">{error}</span>
+                </div>
               )}
-            </button>
-          </form>
+
+              <button
+                type="submit"
+                disabled={status === "sending" || !email}
+                className="w-full py-3.5 bg-foreground text-background rounded-full text-sm font-medium uppercase tracking-[0.22em] hover:bg-foreground/90 transition-colors flex items-center justify-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {status === "sending" ? "Sending…" : "Send Magic Link"}
+                {status !== "sending" && (
+                  <ArrowRight size={15} strokeWidth={1.75} className="group-hover:translate-x-0.5 transition-transform" />
+                )}
+              </button>
+            </form>
+          </div>
         )}
 
         <p className="text-center text-xs text-muted-foreground font-light">
