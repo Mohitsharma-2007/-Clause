@@ -53,6 +53,8 @@ Ensure your OAuth providers have the following redirect URLs configured:
 **Development:**
 - `http://localhost:3000/auth/callback`
 
+**IMPORTANT:** The redirect URI must EXACTLY match what your application sends. Include the full URL with protocol (http/https) and the exact path `/auth/callback`.
+
 ## Authentication Flow
 
 1. **New Users**: Redirected to onboarding after first login
